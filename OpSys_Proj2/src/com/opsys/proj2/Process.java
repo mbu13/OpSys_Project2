@@ -12,7 +12,8 @@ public class Process {
 
 
     public static class Blueprint {
-        // procN pN_mem pN_arr_time_1/pN_run_time_1 ... p1_arr_time_z/p1_run_time_z
+       
+    	// procN pN_mem pN_arr_time_1/pN_run_time_1 ... p1_arr_time_z/p1_run_time_z
         final String procId;
         final int memFrames;
         ArrayList<Time> processTimes;
@@ -25,6 +26,7 @@ public class Process {
     }
     
     public static class Time {
+    	
     	final int arrival;
     	final int run;
     	
@@ -33,4 +35,5 @@ public class Process {
     		this.run = run;
     	}
     }
+    
 }
