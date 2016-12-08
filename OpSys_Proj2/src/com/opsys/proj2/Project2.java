@@ -21,10 +21,16 @@ public class Project2 {
         
         // Create the memory management algorithms
         Algorithm bf = new BestFitAlgorithm( );
+        Algorithm wf = new WorstFitAlgorithm( );
+        Algorithm nf = new NextFitAlgorithm( );
         
         // Run each simulation
     	try {
+    		nf.simulate( parseInputFile(args[0]) );
+    		System.out.println();
 			bf.simulate( parseInputFile(args[0]) );
+    		System.out.println();
+			wf.simulate( parseInputFile(args[0]) );
 		} catch (IOException e) {
 			e.printStackTrace();
 		}      

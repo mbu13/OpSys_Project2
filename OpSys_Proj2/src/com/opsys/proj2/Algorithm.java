@@ -50,14 +50,20 @@ public abstract class Algorithm {
     	System.out.println();
     }
 
+    // Return structure for defrag
+    public class DefragReturn {
+    	int timeDelay = 0;
+    	ArrayList<String> ids = new ArrayList<>();
+    }
+    
     // Function to defrag the memory
-    public int defrag() {
+    public DefragReturn defrag() {
     	
     	// Make sure the memory is sorted
     	Collections.sort(memory);
     	
-    	// Initialize the time delay to zero
-    	int timeDelay = 0;
+    	// Initialize the return object
+    	DefragReturn dr = new DefragReturn();
     	
     	// Remove all of the empty partitions from the memory
     	for ( int i = memory.size() - 1; i >= 0; --i ) {
@@ -72,9 +78,14 @@ public abstract class Algorithm {
     	// Shift the starting locations of all of the partitions
     	int currentStartLoc = 0;
     	for ( Partition p : memory ) {
+    		if ( p.startLocation == currentStartLoc ) {
+    			currentStartLoc += p.size;
+    			continue;
+    		}
     		p.startLocation = currentStartLoc;
     		currentStartLoc += p.size;    	
-    		timeDelay += p.size;
+    		dr.timeDelay += p.size;
+    		dr.ids.add(p.partitionId);
     	}
     	
     	// Create the new empty partition
@@ -85,7 +96,7 @@ public abstract class Algorithm {
     	Collections.sort( memory );
     
     	// Return the time delay cause by defragmentation
-    	return timeDelay;
+    	return dr;
     }
     
     
@@ -165,14 +176,13 @@ public abstract class Algorithm {
      * @param time
      * @param time delay from defrag
      */
-    public void printProcessEndDefrag( int time, int timeDelay ) {
+    public void printProcessEndDefrag( int time, DefragReturn dr ) {
     	String m = "";
-    	for ( int i = 0; i < memory.size() - 2; ++i ) {
-    		if ( memory.get(i).partitionId.equals(".") ){ continue; }
-    		m += memory.get(i).partitionId + ", ";
+    	for ( int i = 0; i < dr.ids.size() - 1; ++i ) {
+    		m += dr.ids.get(i) + ", ";
     	}
-    	m += memory.get(memory.size()-2).partitionId;
+    	m += dr.ids.get(dr.ids.size() - 1);
     	
-        printMessage(time, String.format("Defragmentation complete (moved %d frames: %s)", timeDelay, m));
+        printMessage(time, String.format("Defragmentation complete (moved %d frames: %s)", dr.timeDelay, m));
     }
 }

@@ -5,14 +5,16 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.PriorityQueue;
 import java.util.Queue;
+
 import com.opsys.proj2.Process.Blueprint;
 import com.opsys.proj2.Process.Time;
 
-public class BestFitAlgorithm extends Algorithm {
+public class NextFitAlgorithm extends Algorithm{
 		
 	PriorityQueue<Event> eventQueue;
+	int startIndex;
 	
-	public BestFitAlgorithm() {
+	public NextFitAlgorithm() {
 		// Initialize the time
 		time = 0;
 		
@@ -20,68 +22,69 @@ public class BestFitAlgorithm extends Algorithm {
 		memory = new ArrayList<>();
 		freeMemory = frames; 
 		memory.add( new Partition( ".", 0, frames ) );
+		startIndex = 0;
 	}
 	
 	@Override
 	public void simulate(Blueprint[] blueprints) {
-
-        // Create the ready queue for events as a priority queue and set the priority
-        eventQueue = new PriorityQueue<Event>( blueprints.length,
-                new Comparator<Event>(){
-                    public int compare(Event a, Event b){
-                        if ( a.time < b.time ) { return -1; }
-                        else if ( b.time < a.time ) { return 1; }
-                        else {
-                        	if ( a.type == EventType.REMOVE && b.type == EventType.ARRIVED ) {
-                        		return -1;
-                        	} else if ( a.type == EventType.ARRIVED && b.type == EventType.REMOVE ) {
-                        		return 1;
-                        	} else {                        	
-                        		return a.processId.compareTo(b.processId);
-                        	}
-                        }
-                    }
-                });
-        
-        
-        // Convert all initial processes to events
-        for ( Process.Blueprint blueprint : blueprints ) {
-        	for ( Time t : blueprint.processTimes ) {
-        
-        		// Create the events for the process
-        		Event eArrive = new Event( blueprint.procId, t.arrival, EventType.ARRIVED, blueprint.memFrames );
-        		Event eRemove = new Event( blueprint.procId, t.arrival+t.run, EventType.REMOVE, blueprint.memFrames );
-        		
-        		// Add the events to the queue
-        		addEvent( eventQueue, eArrive );
-        		addEvent( eventQueue, eRemove );
-        	}
-        }
+	
+	    // Create the ready queue for events as a priority queue and set the priority
+	    eventQueue = new PriorityQueue<Event>( blueprints.length,
+	            new Comparator<Event>(){
+	                public int compare(Event a, Event b){
+	                    if ( a.time < b.time ) { return -1; }
+	                    else if ( b.time < a.time ) { return 1; }
+	                    else {
+	                    	if ( a.type == EventType.REMOVE && b.type == EventType.ARRIVED ) {
+	                    		return -1;
+	                    	} else if ( a.type == EventType.ARRIVED && b.type == EventType.REMOVE ) {
+	                    		return 1;
+	                    	} else {                        	
+	                    		return a.processId.compareTo(b.processId);
+	                    	}
+	                    }
+	                }
+	            });
+	    
+	    
+	    // Convert all initial processes to events
+	    for ( Process.Blueprint blueprint : blueprints ) {
+	    	for ( Time t : blueprint.processTimes ) {
+	    
+	    		// Create the events for the process
+	    		Event eArrive = new Event( blueprint.procId, t.arrival, EventType.ARRIVED, blueprint.memFrames );
+	    		Event eRemove = new Event( blueprint.procId, t.arrival+t.run, EventType.REMOVE, blueprint.memFrames );
+	    		
+	    		// Add the events to the queue
+	    		addEvent( eventQueue, eArrive );
+	    		addEvent( eventQueue, eRemove );
+	    	}
+	    }
 		
-        // Initialize time and display message
-        time = 0;
-        printSimulationStart( time );
-        
-        // Loop through all events
-        while(!eventQueue.isEmpty()) {
-        	
-        	// Get the next event
-            Event e = eventQueue.poll();
-            
-            // Set the current time
-            time = e.time;
-            
-            // Take care of event
-            if ( e.type == EventType.ARRIVED ) {
-            	arrivedEvent( e );
-            } else if ( e.type == EventType.REMOVE ) {
-            	removeEvent( e );
-            }
-            
-        }
-        
-        // Print end of simulation
-        printSimulationEnd( time );
+	    // Initialize time and display message
+	    time = 0;
+	    printSimulationStart( time );
+	    
+	    // Loop through all events
+	    while(!eventQueue.isEmpty()) {
+	    	
+	    	// Get the next event
+	        Event e = eventQueue.poll();
+	        
+	        // Set the current time
+	        time = e.time;
+	        
+	        // Take care of event
+	        if ( e.type == EventType.ARRIVED ) {
+	        	arrivedEvent( e );
+	        } else if ( e.type == EventType.REMOVE ) {
+	        	removeEvent( e );
+	        }
+	        
+	    }
+	    
+	    // Print end of simulation
+	    printSimulationEnd( time );
 		
 	}
 	
@@ -100,11 +103,52 @@ public class BestFitAlgorithm extends Algorithm {
 		// Sort the partitions
 		Collections.sort(memory);
 		
-		// Look for the best fit partition
+		// Find the first possible partition the memory can go in
 		int loc = 0;
-		int smallest = frames + 1;
-		int found = 0;
 		for ( int i = 0; i < memory.size(); ++i ) {
+			if ( startIndex >= memory.get(i).startLocation && startIndex < memory.get(i).startLocation + memory.get(i).size ) {
+				loc = i;
+			}
+		}
+		
+		// See if memory can be added starting at the old spot
+		if ( memory.get(loc).partitionId.equals(".") ) {
+			if ( memory.get(loc).startLocation + memory.get(loc).size >= startIndex + e.space ) {
+				// Create the new partitions
+				Partition p1 = new Partition( e.processId, startIndex, e.space );
+				Partition p2 = new Partition( ".", memory.get(loc).startLocation, startIndex - memory.get(loc).startLocation );
+				Partition p3 = new Partition( ".", startIndex + e.space, memory.get(loc).startLocation+memory.get(loc).size-(startIndex+e.space) );
+				
+				// Remove the old partition
+				memory.remove(loc);
+				
+				// Add the new partitions
+				memory.add(p1);
+				
+				if ( p2.size > 0 ) {
+					memory.add(p2);
+				}
+				if ( p3.size > 0 ) {
+					memory.add(p3);			
+				}
+		
+				// Sort the partitions
+				Collections.sort(memory);
+				
+				startIndex = startIndex + e.space;
+				freeMemory -= e.space;
+				
+				// Print the message
+				printProcessPlaced( time, e.processId );
+				printMemory( memory );
+				
+				return;
+			}
+		}
+		
+		// Look for the next possible partition
+		int found = 0;
+		for ( int i = loc; i < memory.size(); ++i ) {
 			// Continue if the partition is full
 			if ( !memory.get(i).partitionId.equals(".") ) {
 				continue;
@@ -116,14 +160,28 @@ public class BestFitAlgorithm extends Algorithm {
 			}
 			
 			found = 1;
-			
-			if ( memory.get(i).size < smallest ) {
-				smallest = memory.get(i).size;
-				loc = i;
-			}
-			
+			loc = i;
+			break;	
 		}
 		
+		if ( found == 0 ) {
+			for ( int i = 0; i < loc; ++i ) {
+				// Continue if the partition is full
+				if ( !memory.get(i).partitionId.equals(".") ) {
+					continue;
+				}
+				
+				// See if the data will fit
+				if ( memory.get(i).size < e.space ) {
+					continue;
+				}
+				
+				found = 1;
+				loc = i;
+				break;	
+			}
+		}
+	
 		if ( found == 0 ) {
 			// Display the defrag message 
 			printProcessStartDefrag( time, e.processId );
@@ -151,6 +209,9 @@ public class BestFitAlgorithm extends Algorithm {
 		if ( memory.get(loc).size == e.space ) {
 			// Set the partition ID
 			memory.get(loc).partitionId = e.processId;
+			
+			// Sort the partitions
+			Collections.sort(memory);
 		} else {
 			// Create the two new partitions
 			Partition p1 = new Partition( e.processId, memory.get(loc).startLocation, e.space );
@@ -167,12 +228,13 @@ public class BestFitAlgorithm extends Algorithm {
 			Collections.sort(memory);
 		}
 		
+		startIndex = memory.get(loc).startLocation + e.space;
 		freeMemory -= e.space;
 		
 		// Print the message
 		printProcessPlaced( time, e.processId );
 		printMemory( memory );
-
+	
 	}
 	
 	private void removeEvent( Event e ) {
@@ -226,16 +288,16 @@ public class BestFitAlgorithm extends Algorithm {
 		printMemory( memory );
 		
 	}
-
+	
 	private void addTimeDelay( int timeDelay ) {
 		
 		// Create the new queue
 		PriorityQueue<Event> nq = new PriorityQueue<Event>( eventQueue.size(),
 				new Comparator<Event>(){
-            		public int compare(Event a, Event b){
-            			if ( a.time < b.time ) { return -1; }
-            			else if ( b.time < a.time ) { return 1; }
-            			else {
+	        		public int compare(Event a, Event b){
+	        			if ( a.time < b.time ) { return -1; }
+	        			else if ( b.time < a.time ) { return 1; }
+	        			else {
 		                	if ( a.type == EventType.REMOVE && b.type == EventType.ARRIVED ) {
 		                		return -1;
 		                	} else if ( a.type == EventType.ARRIVED && b.type == EventType.REMOVE ) {
@@ -243,26 +305,26 @@ public class BestFitAlgorithm extends Algorithm {
 		                	} else {                        	
 		                		return a.processId.compareTo(b.processId);
 		                	}
-            			}
-            		}
-        });
+	        			}
+	        		}
+	    });
 		
 		// Remove all old events, increment time, and place in new queue
-        while(!eventQueue.isEmpty()) {
-        	
-        	// Get the next event
-            Event e = eventQueue.poll();
-            
-            // Set the new time
-            e.time += timeDelay;
-            
-            // Add the event to the new queue
-            nq.add(e);
-            
-        }
-        
-        // Set the queue
-        eventQueue = nq;
+	    while(!eventQueue.isEmpty()) {
+	    	
+	    	// Get the next event
+	        Event e = eventQueue.poll();
+	        
+	        // Set the new time
+	        e.time += timeDelay;
+	        
+	        // Add the event to the new queue
+	        nq.add(e);
+	        
+	    }
+	    
+	    // Set the queue
+	    eventQueue = nq;
 	}
 	
 	public class Event {		
@@ -280,24 +342,24 @@ public class BestFitAlgorithm extends Algorithm {
 	        this.space = s;
 	    }
 	}
-
+	
 	private void addEvent( PriorityQueue<Event> pq, Event e ) {
 		addToQueueNoDup( pq, e );
 	}
-
+	
 	private <S> void addToQueueNoDup(Queue<S> queue, S value) {
 	    if(!queue.contains(value)) {
 	        queue.add(value);
 	    }
 	}
-
+	
 	private enum EventType {
 	    ARRIVED, REMOVE
 	}
 	
 	@Override
 	public String getName() {
-		return "Contiguous -- Best-Fit";
+		return "Contiguous -- Next-Fit";
 	}
-	
+
 }
