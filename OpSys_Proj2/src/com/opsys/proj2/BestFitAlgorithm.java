@@ -5,12 +5,13 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.PriorityQueue;
 import java.util.Queue;
-
 import com.opsys.proj2.Process.Blueprint;
 import com.opsys.proj2.Process.Time;
 
 public class BestFitAlgorithm extends Algorithm {
 		
+	PriorityQueue<Event> eventQueue;
+	
 	public BestFitAlgorithm() {
 		// Initialize the time
 		time = 0;
@@ -24,14 +25,20 @@ public class BestFitAlgorithm extends Algorithm {
 	@Override
 	public void simulate(Blueprint[] blueprints) {
 
-        // Create the ready queue as a priority queue and set the priority
-        PriorityQueue<Event> eventQueue = new PriorityQueue<Event>( blueprints.length,
+        // Create the ready queue for events as a priority queue and set the priority
+        eventQueue = new PriorityQueue<Event>( blueprints.length,
                 new Comparator<Event>(){
                     public int compare(Event a, Event b){
                         if ( a.time < b.time ) { return -1; }
                         else if ( b.time < a.time ) { return 1; }
                         else {
-                        	return a.processId.compareTo(b.processId);
+                        	if ( a.type == EventType.REMOVE && b.type == EventType.ARRIVED ) {
+                        		return -1;
+                        	} else if ( a.type == EventType.ARRIVED && b.type == EventType.REMOVE ) {
+                        		return 1;
+                        	} else {                        	
+                        		return a.processId.compareTo(b.processId);
+                        	}
                         }
                     }
                 });
@@ -72,6 +79,9 @@ public class BestFitAlgorithm extends Algorithm {
             }
             
         }
+        
+        // Print end of simulation
+        printSimulationEnd( time );
 		
 	}
 	
@@ -83,6 +93,7 @@ public class BestFitAlgorithm extends Algorithm {
 		// Make sure there is enough free space available
 		if ( freeMemory < e.space ) {
 			printProcessSkipped( time, e.processId );
+			printMemory( memory );
 			return;
 		}
 		
@@ -114,9 +125,27 @@ public class BestFitAlgorithm extends Algorithm {
 		}
 		
 		if ( found == 0 ) {
-			//DEFRAG 
-			System.out.println("DEFRAG");
-			return;
+			// Display the defrag message 
+			printProcessStartDefrag( time, e.processId );
+			
+			// Defrag the memory
+			int timeDelay = defrag();
+			
+			// Add the time delay to the time
+			time += timeDelay;
+			addTimeDelay( timeDelay );
+			
+			// Print end of defrag
+			printProcessEndDefrag( time, timeDelay );
+			printMemory(memory);
+			
+			// Get the location of the empty partition and continue
+			for ( int i = 0; i < memory.size(); ++i ) {
+				if ( memory.get(i).partitionId.equals(".") ) {
+					loc = i;
+					break;
+				}
+			}
 		}
 		
 		if ( memory.get(loc).size == e.space ) {
@@ -143,9 +172,7 @@ public class BestFitAlgorithm extends Algorithm {
 		// Print the message
 		printProcessPlaced( time, e.processId );
 		printMemory( memory );
-		
-		
-		
+
 	}
 	
 	private void removeEvent( Event e ) {
@@ -179,14 +206,14 @@ public class BestFitAlgorithm extends Algorithm {
 		freeMemory += memory.get(loc).size;
 		
 		// See if the partitions can be merged
-		if ( loc - 1 >= 0 && loc + 1 < memory.size() && memory.get(loc-1).equals(".") && memory.get(loc+1).equals(".") ) {
+		if ( loc - 1 >= 0 && loc + 1 < memory.size() && memory.get(loc-1).partitionId.equals(".") && memory.get(loc+1).partitionId.equals(".") ) {
 			memory.get(loc-1).size += memory.get(loc).size + memory.get(loc+1).size;
 			memory.remove(loc+1);
 			memory.remove(loc);
-		} else if ( loc - 1 >= 0 && memory.get(loc-1).equals(".") ) {
+		} else if ( loc - 1 >= 0 && memory.get(loc-1).partitionId.equals(".") ) {
 			memory.get(loc-1).size += memory.get(loc).size;
 			memory.remove(loc);
-		} else if ( loc + 1 < memory.size() && memory.get(loc+1).equals(".") ) {
+		} else if ( loc + 1 < memory.size() && memory.get(loc+1).partitionId.equals(".") ) {
 			memory.get(loc).size += memory.get(loc+1).size;
 			memory.remove(loc+1);
 		}
@@ -197,13 +224,53 @@ public class BestFitAlgorithm extends Algorithm {
 		// Print message
 		printProcessRemoved( time, e.processId );
 		printMemory( memory );
+		
 	}
 
+	
+	private void addTimeDelay( int timeDelay ) {
+		
+		// Create the new queue
+		PriorityQueue<Event> nq = new PriorityQueue<Event>( eventQueue.size(),
+				new Comparator<Event>(){
+            		public int compare(Event a, Event b){
+            			if ( a.time < b.time ) { return -1; }
+            			else if ( b.time < a.time ) { return 1; }
+            			else {
+		                	if ( a.type == EventType.REMOVE && b.type == EventType.ARRIVED ) {
+		                		return -1;
+		                	} else if ( a.type == EventType.ARRIVED && b.type == EventType.REMOVE ) {
+		                		return 1;
+		                	} else {                        	
+		                		return a.processId.compareTo(b.processId);
+		                	}
+            			}
+            		}
+        });
+		
+		// Remove all old events, increment time, and place in new queue
+        while(!eventQueue.isEmpty()) {
+        	
+        	// Get the next event
+            Event e = eventQueue.poll();
+            
+            // Set the new time
+            e.time += timeDelay;
+            
+            // Add the event to the new queue
+            nq.add(e);
+            
+        }
+        
+        // Set the queue
+        eventQueue = nq;
+	}
+	
 	private class Event {		
 		// Create member variables
 	    public final EventType type;
 	    public final String processId;
-	    public final int time;
+	    public int time;
 	    public final int space;
 	    
 	    //Create the constructor
@@ -215,20 +282,23 @@ public class BestFitAlgorithm extends Algorithm {
 	    }
 	}
 	
+
 	private void addEvent( PriorityQueue<Event> pq, Event e ) {
 		addToQueueNoDup( pq, e );
 	}
+
 	
 	private <S> void addToQueueNoDup(Queue<S> queue, S value) {
 	    if(!queue.contains(value)) {
 	        queue.add(value);
 	    }
 	}
+
 	
 	private enum EventType {
 	    ARRIVED, REMOVE
 	}
-
+	
 	@Override
 	public String getName() {
 		return "Contiguous -- Best-Fit";

@@ -3,6 +3,7 @@ package com.opsys.proj2;
 import java.util.ArrayList;
 import java.util.Collections;
 
+
 public abstract class Algorithm {
 	
 	int time;
@@ -15,6 +16,7 @@ public abstract class Algorithm {
 	//main simulation method
     public abstract void simulate(Process.Blueprint[] blueprints);
     
+    // Function to get the name of the algorithm
     public abstract String getName();
 
     // Function to print the memory to the screen
@@ -48,7 +50,43 @@ public abstract class Algorithm {
     	System.out.println();
     }
 
+    // Function to defrag the memory
+    public int defrag() {
+    	
+    	// Make sure the memory is sorted
+    	Collections.sort(memory);
+    	
+    	// Initialize the time delay to zero
+    	int timeDelay = 0;
+    	
+    	// Remove all of the empty partitions from the memory
+    	for ( int i = memory.size() - 1; i >= 0; --i ) {
+    		if ( memory.get(i).partitionId.equals(".") ) {
+    			memory.remove(i);
+    		}
+    	}
+    	
+    	// Make sure the memory is sorted
+    	Collections.sort(memory); 
+    	
+    	// Shift the starting locations of all of the partitions
+    	int currentStartLoc = 0;
+    	for ( Partition p : memory ) {
+    		p.startLocation = currentStartLoc;
+    		currentStartLoc += p.size;    	
+    		timeDelay += p.size;
+    	}
+    	
+    	// Create the new empty partition
+    	Partition p = new Partition( ".", currentStartLoc, freeMemory );
+    	memory.add(p);
+    	
+    	// Sort the memory
+    	Collections.sort( memory );
     
+    	// Return the time delay cause by defragmentation
+    	return timeDelay;
+    }
     
     
     /**
@@ -69,7 +107,7 @@ public abstract class Algorithm {
     }
     
     /**
-     * Print statement for the start of the simulation
+     * Print statement for the end of the simulation
      * @param time
      */
     public void printSimulationEnd( int time ) {
@@ -113,4 +151,28 @@ public abstract class Algorithm {
         printMessage(time, String.format("Cannot place process %s -- skipped!", id));
     }
     
+    /**
+     * Print statement for a process starting defrag.
+     * @param time
+     * @param process id
+     */
+    public void printProcessStartDefrag( int time, String id ) {
+        printMessage(time, String.format("Cannot place process %s -- starting defragmentation", id));
+    }
+    
+    /**
+     * Print statement for a process ending defrag.
+     * @param time
+     * @param time delay from defrag
+     */
+    public void printProcessEndDefrag( int time, int timeDelay ) {
+    	String m = "";
+    	for ( int i = 0; i < memory.size() - 2; ++i ) {
+    		if ( memory.get(i).partitionId.equals(".") ){ continue; }
+    		m += memory.get(i).partitionId + ", ";
+    	}
+    	m += memory.get(memory.size()-2).partitionId;
+    	
+        printMessage(time, String.format("Defragmentation complete (moved %d frames: %s)", timeDelay, m));
+    }
 }
