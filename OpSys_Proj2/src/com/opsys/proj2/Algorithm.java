@@ -6,12 +6,12 @@ import java.util.Collections;
 
 public abstract class Algorithm {
 	
+	// Declare variables
 	int time;
 	protected final int framesPerLine = 32;
 	protected final int frames = 256;
 	ArrayList<Partition> memory;
 	int freeMemory;
-	
 	
 	//main simulation method
     public abstract void simulate(Process.Blueprint[] blueprints);

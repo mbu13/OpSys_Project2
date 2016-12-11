@@ -20,7 +20,7 @@ public class NextFitAlgorithm extends Algorithm{
 		
 		// Initialize memory
 		memory = new ArrayList<>();
-		freeMemory = frames; 
+		freeMemory = frames;
 		memory.add( new Partition( ".", 0, frames ) );
 		startIndex = 0;
 	}

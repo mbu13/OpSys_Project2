@@ -9,18 +9,22 @@ import java.util.Queue;
 import com.opsys.proj2.Process.Blueprint;
 import com.opsys.proj2.Process.Time;
 
-public class WorstFitAlgorithm extends Algorithm{
+
+public class NonContiguousAlgorithm extends Algorithm{
 	
 	PriorityQueue<Event> eventQueue;
+	ArrayList<RunningProcess> processes;
 	
-	public WorstFitAlgorithm() {
+	public NonContiguousAlgorithm() {
 		// Initialize the time
 		time = 0;
 		
 		// Initialize memory
 		memory = new ArrayList<>();
 		freeMemory = frames; 
-		memory.add( new Partition( ".", 0, frames ) );
+		for ( int i = 0; i < frames; ++i ) {
+			memory.add( new Partition( ".", i, 1 ) );
+		}
 	}
 	
 	@Override
@@ -44,6 +48,8 @@ public class WorstFitAlgorithm extends Algorithm{
 	                }
 	            });
 	    
+	    // Initialize the array list of processes
+	    processes = new ArrayList<RunningProcess>();
 	    
 	    // Convert all initial processes to events
 	    for ( Process.Blueprint blueprint : blueprints ) {
@@ -101,74 +107,25 @@ public class WorstFitAlgorithm extends Algorithm{
 		// Sort the partitions
 		Collections.sort(memory);
 		
-		// Look for the best fit partition
-		int loc = 0;
-		int largest = -1;
-		int found = 0;
+		// Add data to memory, keeping track of the locations
+		RunningProcess newProcess = new RunningProcess( e.processId );
+		int count = 0;
 		for ( int i = 0; i < memory.size(); ++i ) {
-			// Continue if the partition is full
-			if ( !memory.get(i).partitionId.equals(".") ) {
-				continue;
-			}
-			
-			// See if the data will fit
-			if ( memory.get(i).size < e.space ) {
-				continue;
-			}
-			
-			found = 1;
-			
-			if ( memory.get(i).size > largest ) {
-				largest = memory.get(i).size;
-				loc = i;
-			}
-			
-		}
-		
-		if ( found == 0 ) {
-			// Display the defrag message 
-			printProcessStartDefrag( time, e.processId );
-			
-			// Defrag the memory
-			DefragReturn dr = defrag();
-			
-			// Add the time delay to the time
-			time += dr.timeDelay;
-			addTimeDelay( dr.timeDelay );
-			
-			// Print end of defrag
-			printProcessEndDefrag( time, dr );
-			printMemory(memory);
-			
-			// Get the location of the empty partition and continue
-			for ( int i = 0; i < memory.size(); ++i ) {
-				if ( memory.get(i).partitionId.equals(".") ) {
-					loc = i;
+			if ( memory.get(i).partitionId.equals(".") ) {
+				memory.get(i).partitionId = e.processId;
+				count++;
+				newProcess.frames.add(i);
+				if ( count >= e.space ) {
 					break;
 				}
 			}
 		}
 		
-		if ( memory.get(loc).size == e.space ) {
-			// Set the partition ID
-			memory.get(loc).partitionId = e.processId;
-		} else {
-			// Create the two new partitions
-			Partition p1 = new Partition( e.processId, memory.get(loc).startLocation, e.space );
-			Partition p2 = new Partition( ".", memory.get(loc).startLocation + e.space, memory.get(loc).size-e.space );
-			
-			// Remove the old partition
-			memory.remove(loc);
-			
-			// Add the two new partitions
-			memory.add(p1);
-			memory.add(p2);
-			
-			// Sort the partitions
-			Collections.sort(memory);
-		}
-		
+		// Adjust the amount of free memory
 		freeMemory -= e.space;
+		
+		// Add the running process to the list
+		processes.add( newProcess );
 		
 		// Print the message
 		printProcessPlaced( time, e.processId );
@@ -179,45 +136,29 @@ public class WorstFitAlgorithm extends Algorithm{
 	private void removeEvent( Event e ) {
 		
 		// If ID is not in memory, return
-		int found = 0;
-		for ( Partition p : memory ) {
-			if ( p.partitionId.equals(e.processId) ) {
-				found = 1;
-			}
-		}
-		
-		if ( found == 0 ) { return; }
-		
-		// Sort the partitions
-		Collections.sort( memory );
-		
-		// Find the location of the desired partition
-		int loc = 0;
-		for ( int i = 0; i < memory.size(); ++i ) {
-			if ( memory.get(i).partitionId.equals(e.processId) ) {
+		int loc = -1;
+		for ( int i = 0; i < processes.size(); ++i ) {
+			if ( processes.get(i).processId.equals( e.processId ) ) {
 				loc = i;
 				break;
 			}
 		}
 		
-		// Set the partition id to empty
-		memory.get(loc).partitionId = ".";
+		if ( loc == -1 ) { return; }
+		
+		// Sort the partitions
+		Collections.sort( memory );
+		
+		// Go through all of locations in memory and remove data
+		for ( Integer i : processes.get(loc).frames ) {
+			memory.get(i).partitionId = ".";
+		}
 		
 		// Add free memory
-		freeMemory += memory.get(loc).size;
+		freeMemory += e.space;
 		
-		// See if the partitions can be merged
-		if ( loc - 1 >= 0 && loc + 1 < memory.size() && memory.get(loc-1).partitionId.equals(".") && memory.get(loc+1).partitionId.equals(".") ) {
-			memory.get(loc-1).size += memory.get(loc).size + memory.get(loc+1).size;
-			memory.remove(loc+1);
-			memory.remove(loc);
-		} else if ( loc - 1 >= 0 && memory.get(loc-1).partitionId.equals(".") ) {
-			memory.get(loc-1).size += memory.get(loc).size;
-			memory.remove(loc);
-		} else if ( loc + 1 < memory.size() && memory.get(loc+1).partitionId.equals(".") ) {
-			memory.get(loc).size += memory.get(loc+1).size;
-			memory.remove(loc+1);
-		}
+		// Remove the running process
+		processes.remove(loc);
 		
 		// Sort the partitions
 		Collections.sort( memory );
@@ -227,43 +168,17 @@ public class WorstFitAlgorithm extends Algorithm{
 		printMemory( memory );
 		
 	}
-	
-	private void addTimeDelay( int timeDelay ) {
 		
-		// Create the new queue
-		PriorityQueue<Event> nq = new PriorityQueue<Event>( eventQueue.size(),
-				new Comparator<Event>(){
-	        		public int compare(Event a, Event b){
-	        			if ( a.time < b.time ) { return -1; }
-	        			else if ( b.time < a.time ) { return 1; }
-	        			else {
-		                	if ( a.type == EventType.REMOVE && b.type == EventType.ARRIVED ) {
-		                		return -1;
-		                	} else if ( a.type == EventType.ARRIVED && b.type == EventType.REMOVE ) {
-		                		return 1;
-		                	} else {                        	
-		                		return a.processId.compareTo(b.processId);
-		                	}
-	        			}
-	        		}
-	    });
+	private class RunningProcess {
+		// Create member variables
+		public String processId;
+		public ArrayList<Integer> frames;
 		
-		// Remove all old events, increment time, and place in new queue
-	    while(!eventQueue.isEmpty()) {
-	    	
-	    	// Get the next event
-	        Event e = eventQueue.poll();
-	        
-	        // Set the new time
-	        e.time += timeDelay;
-	        
-	        // Add the event to the new queue
-	        nq.add(e);
-	        
-	    }
-	    
-	    // Set the queue
-	    eventQueue = nq;
+		// Constructor
+		private RunningProcess( String pid ) {
+			processId = pid;
+			frames = new ArrayList<Integer>();
+		}
 	}
 	
 	private class Event {		
@@ -298,7 +213,7 @@ public class WorstFitAlgorithm extends Algorithm{
 	
 	@Override
 	public String getName() {
-		return "Contiguous -- Worst-Fit";
+		return "Non-contiguous";
 	}
 
 }

@@ -6,8 +6,6 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
 
-import com.opsys.proj2.Process.Time;
-
 public class Project2 {
 
 	public static void main(String[] args) {
@@ -23,6 +21,7 @@ public class Project2 {
         Algorithm bf = new BestFitAlgorithm( );
         Algorithm wf = new WorstFitAlgorithm( );
         Algorithm nf = new NextFitAlgorithm( );
+        Algorithm nc = new NonContiguousAlgorithm( );
         
         // Run each simulation
     	try {
@@ -31,6 +30,8 @@ public class Project2 {
 			bf.simulate( parseInputFile(args[0]) );
     		System.out.println();
 			wf.simulate( parseInputFile(args[0]) );
+			System.out.println();
+			nc.simulate( parseInputFile(args[0]) );
 		} catch (IOException e) {
 			e.printStackTrace();
 		}      
